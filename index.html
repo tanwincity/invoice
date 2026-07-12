@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天韻娛樂｜發票歸檔系統</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --red:#8B1C1C;--red-l:#FEF2F2;--red-m:#DC2626;
+  --gold:#D97706;--gold-l:#FEF3C7;
+  --green:#16A34A;--green-l:#F0FDF4;
+  --bg:#F9F9F7;--white:#FFFFFF;--text:#1A1A1A;--muted:#6B7280;--border:#E5E7EB;
+  --r:10px;
+}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:60px}
+
+/* HEADER */
+.header{background:var(--red);padding:20px 20px 16px;border-bottom:3px solid var(--gold)}
+.header h1{font-family:'Noto Serif TC',serif;font-size:1.2rem;color:#FEF3C7;letter-spacing:.1em}
+.header p{font-size:.72rem;color:#FCA5A5;margin-top:2px}
+
+/* NAV TABS */
+.tabs{display:flex;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex-shrink:0;padding:12px 20px;font-size:.82rem;color:var(--muted);border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab.active{color:var(--red);border-bottom-color:var(--red);font-weight:500}
+
+/* MAIN */
+.main{max-width:680px;margin:0 auto;padding:20px 16px}
+
+/* SUMMARY CARDS */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.sc{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:14px 12px;text-align:center}
+.sc-val{font-family:'Noto Serif TC',serif;font-size:1.3rem;font-weight:700}
+.sc-val.income{color:var(--green)}.sc-val.expense{color:var(--red-m)}.sc-val.net{color:var(--text)}
+.sc-label{font-size:.68rem;color:var(--muted);margin-top:3px}
+
+/* PERIOD FILTER */
+.period-row{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.period-row select{padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Noto Sans TC',sans-serif;font-size:.82rem;color:var(--text);background:var(--white);outline:none}
+.period-label{font-size:.78rem;color:var(--muted)}
+
+/* PAGE */
+.pg{display:none}.pg.on{display:block}
+
+/* SECTION TITLE */
+.stitle{font-family:'Noto Serif TC',serif;font-size:.9rem;color:var(--red);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.stitle::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* FORM */
+.form-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:5px}.fg.full{grid-column:1/-1}
+label{font-size:.73rem;color:var(--muted);font-weight:500}
+input,select,textarea{padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-family:'Noto Sans TC',sans-serif;font-size:.85rem;color:var(--text);background:var(--bg);outline:none;width:100%;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--red-m);background:var(--white)}
+
+/* TYPE TOGGLE */
+.type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.tt{padding:10px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-family:'Noto Sans TC',sans-serif;font-size:.85rem;cursor:pointer;font-weight:500;transition:all .2s;text-align:center}
+.tt.sales.active{background:var(--green-l);border-color:var(--green);color:var(--green)}
+.tt.purchase.active{background:var(--red-l);border-color:var(--red-m);color:var(--red-m)}
+
+/* SUBMIT */
+.sbtn{width:100%;padding:12px;background:var(--red);color:#FEF3C7;border:none;border-radius:8px;font-family:'Noto Serif TC',serif;font-size:.9rem;letter-spacing:.08em;cursor:pointer;transition:all .2s;margin-top:4px}
+.sbtn:hover{background:#7F1D1D}.sbtn:active{transform:scale(.98)}
+.sbtn:disabled{background:#D1D5DB;cursor:not-allowed}
+
+/* SUCCESS */
+.sbox{background:var(--green-l);border:1px solid #86EFAC;border-radius:8px;padding:12px;text-align:center;display:none;margin-top:10px}
+.sbox.show{display:block}
+.sbox p{font-size:.8rem;color:var(--green)}
+
+/* INVOICE LIST */
+.inv-list{display:flex;flex-direction:column;gap:8px}
+.inv-item{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.inv-type{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;font-weight:700}
+.inv-type.sales{background:var(--green-l);color:var(--green)}
+.inv-type.purchase{background:var(--red-l);color:var(--red-m)}
+.inv-info{flex:1;min-width:0}
+.inv-no{font-size:.78rem;font-weight:700;color:var(--text)}
+.inv-desc{font-size:.72rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inv-date{font-size:.68rem;color:var(--muted)}
+.inv-amount{font-size:.95rem;font-weight:700;flex-shrink:0}
+.inv-amount.sales{color:var(--green)}
+.inv-amount.purchase{color:var(--red-m)}
+.inv-del{width:28px;height:28px;border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:.85rem;border-radius:6px;flex-shrink:0}
+.inv-del:hover{background:var(--red-l);color:var(--red-m)}
+
+/* STATUS BADGE */
+.badge{font-size:.65rem;padding:2px 8px;border-radius:20px;flex-shrink:0}
+.badge.pending{background:var(--gold-l);color:var(--gold)}
+.badge.filed{background:var(--green-l);color:var(--green)}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:.83rem}
+
+/* PERIOD SUMMARY */
+.period-summary{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px}
+.ps-row{display:flex;justify-content:space-between;font-size:.82rem;padding:6px 0;border-bottom:1px solid var(--border)}
+.ps-row:last-child{border:none;font-weight:700;font-size:.88rem;padding-top:10px}
+.ps-row .green{color:var(--green)}.ps-row .red{color:var(--red-m)}
+
+/* ALERT */
+.alert-box{background:var(--gold-l);border:1px solid #FDE68A;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.8rem;color:var(--gold);display:flex;gap:10px;align-items:flex-start}
+
+@media(max-width:400px){.fgrid{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>天韻娛樂｜發票歸檔系統</h1>
+  <p>每個奇數月10號前完成歸檔並報帳</p>
+  <p id="gas-status" style="display:none;font-size:.7rem;margin-top:4px;color:#86EFAC"></p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="show('overview',this)">總覽</button>
+  <button class="tab" onclick="show('add',this)">新增發票</button>
+  <button class="tab" onclick="show('list',this)">發票明細</button>
+  <button class="tab" onclick="show('report',this)">報表</button>
+</div>
+
+<div class="main">
+
+  <!-- 總覽 -->
+  <div class="pg on" id="pg-overview">
+    <div id="next-tax-alert" class="alert-box" style="display:none">
+      📅 <div><strong>報稅提醒：</strong>下次報稅日即將到來，請確認所有發票已歸檔完成！</div>
+    </div>
+
+    <div class="stitle">本期摘要</div>
+
+    <div class="period-row">
+      <span class="period-label">期別：</span>
+      <select id="overview-period" onchange="renderOverview()">
+        <option value="">全部</option>
+      </select>
+    </div>
+
+    <div class="summary">
+      <div class="sc"><div class="sc-val income" id="ov-income">$0</div><div class="sc-label">銷項（含稅）</div></div>
+      <div class="sc"><div class="sc-val expense" id="ov-expense">$0</div><div class="sc-label">進項（含稅）</div></div>
+      <div class="sc"><div class="sc-val net" id="ov-tax">$0</div><div class="sc-label">應繳稅額</div></div>
+    </div>
+
+    <div class="period-summary" id="period-detail">
+      <div class="ps-row"><span>銷項金額（未稅）</span><span class="green" id="ps-income-notax">$0</span></div>
+      <div class="ps-row"><span>銷項稅額（5%）</span><span class="green" id="ps-income-tax">$0</span></div>
+      <div class="ps-row"><span>進項金額（未稅）</span><span class="red" id="ps-expense-notax">$0</span></div>
+      <div class="ps-row"><span>進項稅額（5%）</span><span class="red" id="ps-expense-tax">$0</span></div>
+      <div class="ps-row"><span>應繳稅額（銷項稅－進項稅）</span><span id="ps-net-tax">$0</span></div>
+    </div>
+
+    <div class="stitle">最近10筆發票</div>
+    <div id="recent-list" class="inv-list"><div class="empty">尚無發票記錄</div></div>
+  </div>
+
+  <!-- 新增發票 -->
+  <div class="pg" id="pg-add">
+    <div class="stitle">新增發票記錄</div>
+    <div class="form-card">
+      <div class="type-toggle">
+        <button class="tt sales active" id="tt-sales" onclick="setType('sales')">↑ 銷項發票（收入）</button>
+        <button class="tt purchase" id="tt-purchase" onclick="setType('purchase')">↓ 進項發票（支出）</button>
+      </div>
+      <div class="fgrid">
+        <div class="fg">
+          <label>發票號碼 *</label>
+          <input id="f-no" type="text" placeholder="例：AB12345678">
+        </div>
+        <div class="fg">
+          <label>發票日期 *</label>
+          <input id="f-date" type="date">
+        </div>
+        <div class="fg">
+          <label>對象（客戶/廠商名稱）*</label>
+          <input id="f-party" placeholder="例：○○企業有限公司">
+        </div>
+        <div class="fg">
+          <label>期別</label>
+          <select id="f-period">
+            <option value="">自動判斷</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>未稅金額（NT$）*</label>
+          <input id="f-amount" type="number" placeholder="0" inputmode="numeric">
+        </div>
+        <div class="fg">
+          <label>含稅金額（自動計算）</label>
+          <input id="f-amount-tax" type="text" placeholder="自動填入" readonly style="background:#F3F4F6">
+        </div>
+        <div class="fg full">
+          <label>項目說明</label>
+          <input id="f-desc" placeholder="例：2025年3月活動執行費、場地租金等">
+        </div>
+        <div class="fg">
+          <label>狀態</label>
+          <select id="f-status">
+            <option value="pending">待歸檔</option>
+            <option value="filed">已歸檔</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>備註</label>
+          <input id="f-note" placeholder="選填">
+        </div>
+      </div>
+      <button class="sbtn" id="add-btn" onclick="addInvoice()">儲存發票記錄</button>
+      <div class="sbox" id="add-success"><p>✓ 發票記錄已儲存！</p></div>
+    </div>
+
+    <div style="background:var(--red-l);border-radius:8px;padding:14px 16px;font-size:.78rem;color:var(--red);line-height:1.9">
+      📌 <strong>操作說明</strong><br>
+      1. 拍照給 Claude，Claude 幫您讀取發票內容<br>
+      2. 您確認資料後點「儲存發票記錄」<br>
+      3. 每個奇數月10號前完成本期所有發票歸檔<br>
+      4. 歸檔完成後告知會計師可以進行報稅
+    </div>
+  </div>
+
+  <!-- 發票明細 -->
+  <div class="pg" id="pg-list">
+    <div class="stitle">發票明細</div>
+    <div class="period-row">
+      <span class="period-label">期別：</span>
+      <select id="list-period" onchange="renderList()">
+        <option value="">全部</option>
+      </select>
+      <span class="period-label">類型：</span>
+      <select id="list-type" onchange="renderList()">
+        <option value="">全部</option>
+        <option value="sales">銷項</option>
+        <option value="purchase">進項</option>
+      </select>
+    </div>
+    <div id="inv-list" class="inv-list"><div class="empty">尚無記錄</div></div>
+  </div>
+
+  <!-- 報表 -->
+  <div class="pg" id="pg-report">
+    <div class="stitle">各期報表</div>
+    <div id="report-content"></div>
+  </div>
+
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzuPTC1XIeN9rXqvfLhZ9oLNRkMivA2XQyYNl-xSuxzNFzWSC6xrY7IuSsl_lA50B9KRw/exec';
+const KEY = 'tianyun-invoices-v1';
+let invType = 'sales';
+
+// GAS 同步函數
+async function syncToGAS(action, payload) {
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload })
+    });
+  } catch(e) {
+    console.log('GAS sync error:', e);
+  }
+}
+
+// 期別計算
+function getPeriod(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const p = m <= 2 ? 1 : m <= 4 ? 2 : m <= 6 ? 3 : m <= 8 ? 4 : m <= 10 ? 5 : 6;
+  return `${y}年第${p}期（${getPeriodMonths(p)}）`;
+}
+function getPeriodMonths(p){
+  return ['1–2月','3–4月','5–6月','7–8月','9–10月','11–12月'][p-1];
+}
+
+// 產生期別選項
+function generatePeriods(){
+  const now = new Date();
+  const y = now.getFullYear();
+  const periods = [];
+  for(let yr = y-1; yr <= y+1; yr++){
+    for(let p = 1; p <= 6; p++){
+      periods.push(`${yr}年第${p}期（${getPeriodMonths(p)}）`);
+    }
+  }
+  return periods;
+}
+
+function fillPeriodSelects(){
+  const periods = generatePeriods();
+  const now = new Date();
+  const curPeriod = getPeriod(now.toISOString().split('T')[0]);
+  ['overview-period','list-period','f-period'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const hasAll = id !== 'f-period';
+    sel.innerHTML = hasAll ? '<option value="">全部</option>' : '<option value="">自動判斷</option>';
+    periods.forEach(p=>{
+      const o = document.createElement('option');
+      o.value = p; o.textContent = p;
+      if(id === 'overview-period' && p === curPeriod) o.selected = true;
+      if(id === 'list-period' && p === curPeriod) o.selected = true;
+      sel.appendChild(o);
+    });
+  });
+}
+
+// GAS 連線測試
+async function testGASConnection(){
+  try {
+    const r = await fetch(GAS_URL);
+    const data = await r.json();
+    if(data.status === 'ok'){
+      showStatus('✅ Google 試算表連線成功！發票資料將自動同步。', 'green');
+    }
+  } catch(e) {
+    showStatus('⚠️ 目前離線模式，資料暫存本機，連線後自動同步。', 'orange');
+  }
+}
+
+function showStatus(msg, color){
+  const el = document.getElementById('gas-status');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = color === 'green' ? 'var(--green)' : '#D97706';
+  el.style.display = 'block';
+}
+
+// Storage
+async function load(){
+  try{ const r = await window.storage.get(KEY); return r ? JSON.parse(r.value) : []; }
+  catch(e){ return []; }
+}
+async function save(d){ await window.storage.set(KEY, JSON.stringify(d)); }
+
+// Nav
+function show(name, btn){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pg-'+name).classList.add('on');
+  if(btn) btn.classList.add('active');
+  if(name==='overview') renderOverview();
+  if(name==='list') renderList();
+  if(name==='report') renderReport();
+}
+
+function setType(type){
+  invType = type;
+  document.getElementById('tt-sales').classList.toggle('active', type==='sales');
+  document.getElementById('tt-purchase').classList.toggle('active', type==='purchase');
+}
+
+// Auto-calc tax
+document.addEventListener('DOMContentLoaded',()=>{
+  const amtEl = document.getElementById('f-amount');
+  if(amtEl) amtEl.addEventListener('input',()=>{
+    const v = parseFloat(amtEl.value)||0;
+    document.getElementById('f-amount-tax').value = v ? 'NT$'+(v*1.05).toFixed(0) : '';
+  });
+
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  if(document.getElementById('f-date')) document.getElementById('f-date').value = today;
+
+  // 測試 GAS 連線
+  testGASConnection();
+
+  // Check next tax date
+  checkTaxAlert();
+
+  fillPeriodSelects();
+  renderOverview();
+});
+
+function checkTaxAlert(){
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const isOddMonth = m % 2 !== 0;
+  if(isOddMonth && d <= 10){
+    document.getElementById('next-tax-alert').style.display = 'flex';
+  }
+}
+
+async function addInvoice(){
+  const no = document.getElementById('f-no').value.trim();
+  const date = document.getElementById('f-date').value;
+  const party = document.getElementById('f-party').value.trim();
+  const amount = parseFloat(document.getElementById('f-amount').value);
+
+  if(!no || !date || !party || !amount){ alert('請填寫必填欄位（發票號碼、日期、對象、金額）'); return; }
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true; btn.textContent = '儲存中…';
+
+  const periodSel = document.getElementById('f-period').value;
+  const period = periodSel || getPeriod(date);
+
+  const inv = {
+    id: Date.now().toString(),
+    type: invType,
+    no, date, party, amount,
+    amountTax: Math.round(amount * 1.05),
+    tax: Math.round(amount * 0.05),
+    desc: document.getElementById('f-desc').value,
+    status: document.getElementById('f-status').value,
+    note: document.getElementById('f-note').value,
+    period,
+    createdAt: new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
+  };
+
+  const all = await load();
+  all.push(inv);
+  await save(all);
+
+  // 同步到 Google 試算表
+  syncToGAS('addInvoice', { invoice: inv });
+
+  // Reset
+  ['f-no','f-party','f-amount','f-amount-tax','f-desc','f-note'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('f-status').value='pending';
+  btn.disabled = false; btn.textContent = '儲存發票記錄';
+  document.getElementById('add-success').classList.add('show');
+  setTimeout(()=>document.getElementById('add-success').classList.remove('show'), 2000);
+}
+
+function fmt(n){ return 'NT$'+(Math.abs(n)||0).toLocaleString(); }
+
+async function renderOverview(){
+  const all = await load();
+  const period = document.getElementById('overview-period')?.value || '';
+  const filtered = period ? all.filter(i=>i.period===period) : all;
+
+  const sales = filtered.filter(i=>i.type==='sales');
+  const purchases = filtered.filter(i=>i.type==='purchase');
+
+  const salesTotal = sales.reduce((s,i)=>s+(i.amountTax||0),0);
+  const purchaseTotal = purchases.reduce((s,i)=>s+(i.amountTax||0),0);
+  const salesTax = sales.reduce((s,i)=>s+(i.tax||0),0);
+  const purchaseTax = purchases.reduce((s,i)=>s+(i.tax||0),0);
+  const salesNotax = sales.reduce((s,i)=>s+(i.amount||0),0);
+  const purchaseNotax = purchases.reduce((s,i)=>s+(i.amount||0),0);
+  const netTax = salesTax - purchaseTax;
+
+  document.getElementById('ov-income').textContent = fmt(salesTotal);
+  document.getElementById('ov-expense').textContent = fmt(purchaseTotal);
+  document.getElementById('ov-tax').textContent = fmt(netTax);
+  document.getElementById('ov-tax').style.color = netTax >= 0 ? 'var(--red-m)' : 'var(--green)';
+
+  document.getElementById('ps-income-notax').textContent = fmt(salesNotax);
+  document.getElementById('ps-income-tax').textContent = fmt(salesTax);
+  document.getElementById('ps-expense-notax').textContent = fmt(purchaseNotax);
+  document.getElementById('ps-expense-tax').textContent = fmt(purchaseTax);
+  const netEl = document.getElementById('ps-net-tax');
+  netEl.textContent = fmt(netTax);
+  netEl.className = netTax >= 0 ? 'red' : 'green';
+
+  // Recent
+  const recent = [...all].reverse().slice(0,10);
+  const el = document.getElementById('recent-list');
+  if(!recent.length){ el.innerHTML='<div class="empty">尚無發票記錄</div>'; return; }
+  el.innerHTML = recent.map(i=>invHTML(i)).join('');
+}
+
+async function renderList(){
+  const all = await load();
+  const period = document.getElementById('list-period')?.value || '';
+  const type = document.getElementById('list-type')?.value || '';
+  let filtered = [...all].reverse();
+  if(period) filtered = filtered.filter(i=>i.period===period);
+  if(type) filtered = filtered.filter(i=>i.type===type);
+  const el = document.getElementById('inv-list');
+  if(!filtered.length){ el.innerHTML='<div class="empty">此期別尚無發票</div>'; return; }
+  el.innerHTML = filtered.map(i=>invHTML(i)).join('');
+}
+
+function invHTML(i){
+  return `<div class="inv-item">
+    <div class="inv-type ${i.type}">${i.type==='sales'?'銷':'進'}</div>
+    <div class="inv-info">
+      <div class="inv-no">${i.no} <span class="badge ${i.status}">${i.status==='filed'?'已歸檔':'待歸檔'}</span></div>
+      <div class="inv-desc">${i.party}${i.desc?' · '+i.desc:''}</div>
+      <div class="inv-date">${i.date} · ${i.period||''}</div>
+    </div>
+    <div class="inv-amount ${i.type}">${i.type==='sales'?'+':'-'}${fmt(i.amountTax)}</div>
+    <button class="inv-del" onclick="delInvoice('${i.id}')">✕</button>
+  </div>`;
+}
+
+async function delInvoice(id){
+  if(!confirm('確定要刪除此筆發票記錄？')) return;
+  const all = await load();
+  await save(all.filter(i=>i.id!==id));
+  // 同步刪除到 Google 試算表
+  syncToGAS('deleteInvoice', { id });
+  renderList(); renderOverview();
+}
+
+async function renderReport(){
+  const all = await load();
+  const byPeriod = {};
+  all.forEach(i=>{
+    const p = i.period || '未分類';
+    if(!byPeriod[p]) byPeriod[p] = {sales:[],purchases:[]};
+    if(i.type==='sales') byPeriod[p].sales.push(i);
+    else byPeriod[p].purchases.push(i);
+  });
+
+  const el = document.getElementById('report-content');
+  if(!Object.keys(byPeriod).length){ el.innerHTML='<div class="empty">尚無資料</div>'; return; }
+
+  el.innerHTML = Object.entries(byPeriod).reverse().map(([period, data])=>{
+    const salesTotal = data.sales.reduce((s,i)=>s+(i.amountTax||0),0);
+    const salesTax = data.sales.reduce((s,i)=>s+(i.tax||0),0);
+    const purchaseTotal = data.purchases.reduce((s,i)=>s+(i.amountTax||0),0);
+    const purchaseTax = data.purchases.reduce((s,i)=>s+(i.tax||0),0);
+    const netTax = salesTax - purchaseTax;
+    return `<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px">
+      <div style="font-family:'Noto Serif TC',serif;font-size:.9rem;font-weight:700;color:var(--red);margin-bottom:12px">${period}</div>
+      <div style="font-size:.8rem;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between"><span>銷項筆數</span><span>${data.sales.length}筆</span></div>
+        <div style="display:flex;justify-content:space-between"><span>銷項含稅總額</span><span style="color:var(--green)">${fmt(salesTotal)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>進項筆數</span><span>${data.purchases.length}筆</span></div>
+        <div style="display:flex;justify-content:space-between"><span>進項含稅總額</span><span style="color:var(--red-m)">${fmt(purchaseTotal)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+          <span>應繳稅額</span>
+          <span style="color:${netTax>=0?'var(--red-m)':'var(--green)'}">${fmt(netTax)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
