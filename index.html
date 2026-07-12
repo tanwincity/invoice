@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>天韻娛樂｜發票歸檔系統</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -168,7 +168,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--red-m);background:var
       </div>
 
       <div class="ocr-progress" id="ocr-progress">
-        <p id="ocr-status-text">正在辨識發票內容…</p>
+        <p id="ocr-status-text">Claude AI 辨識中…</p>
         <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
       </div>
 
@@ -178,6 +178,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--red-m);background:var
         <div class="ocr-field"><span class="label">日期</span><span class="val" id="ocr-date">—</span></div>
         <div class="ocr-field"><span class="label">金額</span><span class="val" id="ocr-amount">—</span></div>
         <div class="ocr-field"><span class="label">對象</span><span class="val" id="ocr-party">—</span></div>
+        <div class="ocr-field"><span class="label">說明</span><span class="val" id="ocr-desc">—</span></div>
         <button class="use-result-btn" onclick="useOCRResult()">使用此結果填入表單 →</button>
       </div>
     </div>
@@ -324,61 +325,95 @@ async function runOCR(imageSrc){
   const fill = document.getElementById('progress-fill');
   const statusText = document.getElementById('ocr-status-text');
   progress.style.display = 'block';
-  fill.style.width = '0%';
+  fill.style.width = '10%';
+  statusText.textContent = 'Claude AI 辨識中，請稍候…';
 
   try {
-    const result = await Tesseract.recognize(imageSrc, 'chi_tra+eng', {
-      logger: m => {
-        if(m.status === 'recognizing text'){
-          const pct = Math.round(m.progress * 100);
-          fill.style.width = pct + '%';
-          statusText.textContent = `辨識中… ${pct}%`;
-        }
-      }
+    // 取得 base64（去掉前綴）
+    const base64 = imageSrc.split(',')[1];
+    const mediaType = imageSrc.split(';')[0].split(':')[1] || 'image/jpeg';
+
+    fill.style.width = '40%';
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64 }
+            },
+            {
+              type: 'text',
+              text: `請仔細辨識這張台灣發票或收據，提取以下資訊並以 JSON 格式回傳（只回傳 JSON，不要其他文字）：
+{
+  "invoice_no": "發票號碼（格式如 AB12345678，若無則空字串）",
+  "date": "日期（格式 YYYY-MM-DD，民國年請換算西元年，若無則空字串）",
+  "amount_with_tax": 含稅總金額數字（整數，若無則 0）,
+  "amount_without_tax": 未稅金額數字（整數，若無則 0）,
+  "tax": 稅額數字（整數，若無則 0）,
+  "party": "對方公司名稱或個人名稱（買方或賣方，若無則空字串）",
+  "description": "商品或服務說明（若無則空字串）"
+}`
+            }
+          ]
+        }]
+      })
     });
 
+    fill.style.width = '80%';
+    const data = await response.json();
+    const text = data.content[0].text.trim();
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    fill.style.width = '100%';
     progress.style.display = 'none';
-    const text = result.data.text;
-    parseInvoiceText(text);
+    showOCRResult(parsed);
 
   } catch(e) {
     progress.style.display = 'none';
-    alert('辨識失敗，請重新拍攝或手動輸入');
+    console.error(e);
+    alert('AI 辨識失敗，請確認網路連線後重試，或改用手動輸入');
   }
 }
 
-function parseInvoiceText(text){
-  // 發票號碼：2個英文字母 + 8個數字
-  const noMatch = text.match(/[A-Z]{2}[\s-]?\d{8}/);
-  const invoiceNo = noMatch ? noMatch[0].replace(/[\s-]/g,'') : '';
+function showOCRResult(parsed){
+  // 計算金額
+  let amountWithTax = parsed.amount_with_tax || 0;
+  let amountWithoutTax = parsed.amount_without_tax || 0;
+  let tax = parsed.tax || 0;
 
-  // 金額：找最大的數字（通常是含稅總額）
-  const amounts = [...text.matchAll(/[\d,]+/g)]
-    .map(m => parseInt(m[0].replace(/,/g,'')))
-    .filter(n => n >= 100 && n <= 9999999)
-    .sort((a,b) => b-a);
-  const amount = amounts.length ? amounts[0] : '';
-
-  // 日期：民國年或西元年
-  let dateStr = '';
-  const rocDate = text.match(/(\d{3})[\s\/年](\d{1,2})[\s\/月](\d{1,2})/);
-  const adDate = text.match(/(20\d{2})[\s\/年-](\d{1,2})[\s\/月-](\d{1,2})/);
-  if(rocDate){
-    const y = parseInt(rocDate[1]) + 1911;
-    const m = rocDate[2].padStart(2,'0');
-    const d = rocDate[3].padStart(2,'0');
-    dateStr = `${y}-${m}-${d}`;
-  } else if(adDate){
-    dateStr = `${adDate[1]}-${adDate[2].padStart(2,'0')}-${adDate[3].padStart(2,'0')}`;
+  if(amountWithTax && !amountWithoutTax){
+    amountWithoutTax = Math.round(amountWithTax / 1.05);
+    tax = amountWithTax - amountWithoutTax;
+  } else if(amountWithoutTax && !amountWithTax){
+    tax = Math.round(amountWithoutTax * 0.05);
+    amountWithTax = amountWithoutTax + tax;
   }
 
-  // 顯示辨識結果
-  ocrData = { no: invoiceNo, date: dateStr, amount: amount ? Math.round(amount/1.05) : '', party: '' };
+  // 格式化日期
+  let dateStr = parsed.date || '';
 
-  document.getElementById('ocr-no').textContent = invoiceNo || '未辨識到';
-  document.getElementById('ocr-date').textContent = dateStr || '未辨識到';
-  document.getElementById('ocr-amount').textContent = amount ? 'NT$'+amount.toLocaleString()+'（含稅）' : '未辨識到';
-  document.getElementById('ocr-party').textContent = '請手動填入';
+  ocrData = {
+    no: parsed.invoice_no || '',
+    date: dateStr,
+    amount: amountWithoutTax,
+    amountTax: amountWithTax,
+    party: parsed.party || '',
+    desc: parsed.description || ''
+  };
+
+  document.getElementById('ocr-no').textContent = ocrData.no || '未辨識到';
+  document.getElementById('ocr-date').textContent = ocrData.date || '未辨識到';
+  document.getElementById('ocr-amount').textContent = amountWithTax ? 'NT$'+amountWithTax.toLocaleString()+'（含稅）' : '未辨識到';
+  document.getElementById('ocr-party').textContent = ocrData.party || '未辨識到';
+  document.getElementById('ocr-desc').textContent = ocrData.desc || '未辨識到';
   document.getElementById('ocr-result').style.display = 'block';
 }
 
@@ -389,10 +424,12 @@ function useOCRResult(){
   if(ocrData.date) document.getElementById('f-date').value = ocrData.date;
   if(ocrData.amount){
     document.getElementById('f-amount').value = ocrData.amount;
-    document.getElementById('f-amount').value = ocrData.amount;
-    document.getElementById('f-tax-display').value = Math.round(ocrData.amount*1.05);
+    document.getElementById('f-tax-display').value = ocrData.amountTax || Math.round(ocrData.amount*1.05);
   }
-  document.getElementById('f-party').focus();
+  if(ocrData.party) document.getElementById('f-party').value = ocrData.party;
+  if(ocrData.desc) document.getElementById('f-desc').value = ocrData.desc;
+  if(!ocrData.party) document.getElementById('f-party').focus();
+  else document.getElementById('f-status').focus();
 }
 
 // ── 表單功能 ────────────────────────────────────────────
