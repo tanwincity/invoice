@@ -218,12 +218,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--red-m);background:var
           <select id="f-period"><option value="">自動判斷</option></select>
         </div>
         <div class="fg">
-          <label>未稅金額 *</label>
+          <label>未稅金額（填一個即可）</label>
           <input id="f-amount" type="number" placeholder="0" inputmode="numeric">
         </div>
         <div class="fg">
           <label>含稅金額（自動）</label>
-          <input id="f-tax-display" readonly style="background:#F3F4F6">
+          <input id="f-tax-display" type="number" inputmode="numeric" placeholder="自動計算（可修改）">
         </div>
         <div class="fg full">
           <label>項目說明</label>
@@ -389,7 +389,8 @@ function useOCRResult(){
   if(ocrData.date) document.getElementById('f-date').value = ocrData.date;
   if(ocrData.amount){
     document.getElementById('f-amount').value = ocrData.amount;
-    document.getElementById('f-tax-display').value = 'NT$'+Math.round(ocrData.amount*1.05).toLocaleString();
+    document.getElementById('f-amount').value = ocrData.amount;
+    document.getElementById('f-tax-display').value = Math.round(ocrData.amount*1.05);
   }
   document.getElementById('f-party').focus();
 }
@@ -405,8 +406,11 @@ async function addInvoice(){
   const no = document.getElementById('f-no').value.trim();
   const date = document.getElementById('f-date').value;
   const party = document.getElementById('f-party').value.trim();
-  const amount = parseFloat(document.getElementById('f-amount').value);
-  if(!no||!date||!party||!amount){ alert('請填寫必填欄位（*）'); return; }
+  const amountRaw = parseFloat(document.getElementById('f-amount').value);
+  const taxDisplayRaw = parseFloat(document.getElementById('f-tax-display').value);
+  // 若有含稅金額則反推未稅，否則用未稅金額
+  const amount = taxDisplayRaw ? Math.round(taxDisplayRaw / 1.05) : amountRaw;
+  if(!no||!date||!party||(!amountRaw && !taxDisplayRaw)){ alert('請填寫必填欄位（*）'); return; }
 
   const btn = document.getElementById('add-btn');
   btn.disabled=true; btn.textContent='儲存中…';
@@ -584,7 +588,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
   document.getElementById('f-amount').addEventListener('input',function(){
     const v=parseFloat(this.value)||0;
-    document.getElementById('f-tax-display').value=v?fmt(Math.round(v*1.05)):'';
+    document.getElementById('f-tax-display').value=v?Math.round(v*1.05):'';
   });
   const now=new Date();
   if(now.getMonth()%2===0 && now.getDate()<=10)
